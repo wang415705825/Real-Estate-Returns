@@ -1,0 +1,7 @@
+# For scripts/ (public data only). scripts/check_data.py needs no packages.
+# The construction pipeline has its own list in pipeline/requirements.txt.
+pandas>=2.2
+numpy
+matplotlib
+openpyxl
+xlrd    # only for `scripts/validate.py nareit` (FTSE Nareit .xls download)
