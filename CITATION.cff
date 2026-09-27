@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+message: "If you use these data, please cite the article below and Ling and Naranjo (2015)."
+type: dataset
+title: "Unlevered and levered U.S. equity REIT return indices"
+abstract: >-
+  Quarterly unlevered (asset-level) and levered (equity) total-return indices for U.S.
+  equity REITs, 1993Q1-2025Q4: all equity REITs, core and non-core property types, and 14
+  property types, value- and equal-weighted, following the de-levering method of Ling and
+  Naranjo (2015).
+authors:
+  - family-names: Wang
+    given-names: Chongyu
+    affiliation: Florida State University
+version: "2026.09"
+date-released: "2026-09-27"
+license: CC-BY-NC-4.0
+repository-code: "https://github.com/wang415705825/Real-Estate-Returns"
+url: "https://github.com/wang415705825/Real-Estate-Returns"
+keywords:
+  - REIT
+  - real estate
+  - unlevered returns
+  - commercial real estate
+  - return indices
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Ling
+      given-names: David C.
+    - family-names: Wang
+      given-names: Chongyu
+    - family-names: Zhou
+      given-names: Tingyu
+  title: "Asset productivity, local information diffusion, and commercial real estate returns"
+  journal: "Real Estate Economics"
+  volume: 50
+  issue: "1"
+  start: 89
+  end: 121
+  year: 2022
+  doi: "10.1111/1540-6229.12354"
+references:
+  - type: article
+    authors:
+      - family-names: Ling
+        given-names: David C.
+      - family-names: Naranjo
+        given-names: Andy
+    title: "Returns and information transmission dynamics in public and private real estate markets"
+    journal: "Real Estate Economics"
+    volume: 43
+    issue: "1"
+    start: 163
+    end: 208
+    year: 2015
+    doi: "10.1111/1540-6229.12069"
