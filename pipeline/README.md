@@ -55,6 +55,35 @@ changed relative to the published vintage.
   (pandas ≥ 2.2 is required for `groupby(...).apply(..., include_groups=False)`).
 - Stata 16.1 or later; only built-in commands are used (no user-written packages).
 
+## Updating the series
+
+To add quarters for a new vintage:
+
+1. **Refresh the inputs.** Export a new S&P Global "RE Companies" workbook (same layout as
+   above). In `02_wrds_pull.py`, set `CRSP_END` to the last month-end covered by
+   `crsp.msf_v2` and move `COMP_END` a quarter or two beyond it. Run steps 1–5, and keep the
+   sample counts and the number of blanked cells that `05_build_indices.py` prints.
+2. **Move the coverage and vintage markers.**
+
+   | File | What to change |
+   |---|---|
+   | `scripts/build_outputs.py` | `VINTAGE` and `STAMP`, and the zip `date_time` in `_write_normalized_zip` (keep it equal to `STAMP`); the end quarter in `PERIODS`; the `"2025Q4"` filters and the table label in `readme_table` and `fig_property_types`; the years in the two figure titles; the coverage line in `NOTES` |
+   | `scripts/check_data.py` | `LAST`; `ALLOWED_BLANK` (empty it once no cells are pending) |
+   | `CITATION.cff` | `version`, `date-released`, and the coverage in `abstract` |
+   | `README.md`, `data/README.md`, `docs/methodology.md` | coverage strings, sample counts (REITs, REIT-quarters, REITs per quarter, rows, blanked cells), validation numbers and the figure alt texts |
+   | `CHANGELOG.md` | a new entry at the top |
+
+   `git grep -nE "2025|2026-09" -- . ':!data/*.csv' ':!legacy'` lists the remaining
+   references to the 2026-09 vintage; use the previous end year and vintage next time.
+3. **Rebuild and check.** Run `python scripts/build_outputs.py` (statistics, workbook,
+   figures and the README table) and `python scripts/check_data.py`. Then rerun
+   `python scripts/validate.py ln2015` and `python scripts/validate.py nareit --nareit-file …`
+   with a fresh FTSE Nareit download, and update the validation numbers in `README.md` and
+   `docs/methodology.md`.
+4. **Release.** Commit, tag the release commit `vYYYY.MM` (for example `v2027.09`), and
+   publish a GitHub release from the tag. Earlier vintages stay available from their tags,
+   so the previous files do not need a new `legacy/` folder.
+
 ## Relation to the production code
 
 These are public copies of the scripts used to build the 2026-09 vintage. Steps 1–4
