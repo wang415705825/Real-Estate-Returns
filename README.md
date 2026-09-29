@@ -11,7 +11,7 @@ de-levering method of Ling and Naranjo (2015), as used in Ling, Wang, and Zhou (
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="figures/cumulative_returns-dark.png">
-  <img src="figures/cumulative_returns.png" width="800" alt="Growth of one dollar invested in U.S. equity REITs from 1993 to 2025, value-weighted: the levered (stock) index ends near 20.7 and the unlevered (asset) index near 14.0, with the gap widening over time and a sharp joint drop in 2008–2009.">
+  <img src="figures/cumulative_returns.png" width="800" alt="Line chart titled 'REIT stocks vs. the assets behind them': growth of one dollar invested at the start of 1993 in value-weighted U.S. equity REITs, log scale. The levered (REIT stock) index ends at 20.74 and the unlevered (REIT assets) index at 14.04. A shaded band marks the gap from leverage, which widens over time; gray bars mark the 2001, 2007–09 and 2020 recessions, including the sharp joint drop in 2008–2009.">
 </picture>
 
 ## Data
@@ -56,7 +56,7 @@ Annualized geometric mean return and annualized volatility (quarterly standard d
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="figures/property_type_returns-dark.png">
-  <img src="figures/property_type_returns.png" width="800" alt="Annualized value-weighted returns, 1993–2025, unlevered versus levered, for all equity REITs and the six property types with at least three REITs in every quarter. Levered returns exceed unlevered returns for Health Care, Industrial, Multifamily and Shopping Center REITs; for Office the two are nearly equal, and for Diversified the levered return is slightly lower.">
+  <img src="figures/property_type_returns.png" width="800" alt="Dot chart titled 'What leverage added, by property type': annualized value-weighted returns, 1993–2025, unlevered versus levered, for all equity REITs and the six property types with at least three REITs in every quarter. Levered minus unlevered: all equity REITs +1.28 percentage points (8.34% vs 9.62%), Multifamily +1.91, Industrial +1.70, Health Care +1.54, Shopping Center +0.74, Office +0.03 and Diversified −0.17.">
 </picture>
 
 ## Method in brief
@@ -93,7 +93,7 @@ Sample construction, data fallbacks and limitations are documented in
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="figures/validation_ln2015-dark.png">
-  <img src="figures/validation_ln2015.png" width="480" alt="Scatter plot of quarterly value-weighted unlevered core REIT returns in this dataset against the Ling and Naranjo (2015) series, 1993Q1–2012Q4. The 80 points lie tightly along the 45-degree line; correlation 0.993.">
+  <img src="figures/validation_ln2015.png" width="480" alt="Scatter plot titled 'Tracks Ling and Naranjo (2015) closely': quarterly value-weighted unlevered core REIT returns in this dataset against the Ling and Naranjo (2015) series, 1993Q1–2012Q4. The 80 points lie tightly along the equal-returns line; correlation 0.993.">
 </picture>
 
 | Benchmark | Quarters | Correlation | Annualized return (this dataset vs benchmark) |
@@ -156,8 +156,9 @@ redistributed and is not included here; see the paper for how it is built.
 
 - [`scripts/`](scripts) works from the published CSVs only:
   `pip install -r requirements.txt`, then `python scripts/build_outputs.py` rebuilds the
-  summary statistics, the Excel workbook, the figures and the table above, and
-  `python scripts/check_data.py` runs the integrity checks.
+  summary statistics, the Excel workbook, the figures (including the link-preview cards
+  `figures/social_preview.png` and `figures/social_card_1200x630.png`) and the table above,
+  and `python scripts/check_data.py` runs the integrity checks.
 - [`pipeline/`](pipeline) is the construction code, from vendor data to the CSVs. It needs
   your own access to S&P Global Market Intelligence and WRDS (CRSP, Compustat); see
   [`pipeline/README.md`](pipeline/README.md).
@@ -171,6 +172,8 @@ providers' terms.
 
 - Data and documentation: [CC BY-NC 4.0](LICENSE-DATA) (attribution, non-commercial use).
 - Code: [MIT](LICENSE).
+- The figures use the [Inter](https://github.com/rsms/inter) typeface, included in
+  [`scripts/fonts/`](scripts/fonts) under the [SIL Open Font License 1.1](scripts/fonts/OFL.txt).
 
 ## Versions
 

@@ -3,12 +3,13 @@
 
     data/summary_statistics.csv      annualized statistics by group, weighting, series, period
     data/REIT_Return_Indices.xlsx    Excel copy of the CSVs with a notes sheet
-    figures/*.png                    README figures, light and dark variants
+    figures/*.png                    README figures (light and dark) and link-preview cards
     README.md                        the statistics table between the stats markers
 
 Run from anywhere:  python scripts/build_outputs.py
 Re-running on unchanged CSVs reproduces byte-identical files.
 """
+import glob
 import io
 import os
 import re
@@ -18,12 +19,17 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
+from matplotlib.colors import to_rgba
+from matplotlib.patches import FancyBboxPatch, Rectangle
 from matplotlib.ticker import FixedLocator, FuncFormatter, MultipleLocator
+from matplotlib.transforms import blended_transform_factory
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 DATA, FIGS = os.path.join(ROOT, "data"), os.path.join(ROOT, "figures")
+FONT_DIR = os.path.join(ROOT, "scripts", "fonts")      # Inter, SIL Open Font License 1.1
 LEGACY = os.path.join(ROOT, "legacy", "2021-04", "Unlevered Return Indices.xlsx")
 VINTAGE = "2026-09"
 STAMP = "2026-09-01T00:00:00Z"          # fixed file timestamp for reproducible xlsx builds
@@ -37,10 +43,19 @@ PERIODS = [((1993, 1), (2025, 4)), ((1993, 1), (2012, 4)), ((2013, 1), (2025, 4)
 # validated for both modes with the dataviz palette checker.
 THEMES = {
     "light": dict(surface="#fcfcfb", ink="#0b0b0b", ink2="#52514e", muted="#898781",
-                  grid="#e1e0d9", axis="#c3c2b7", unlev="#2a78d6", lev="#eb6834"),
+                  grid="#e1e0d9", axis="#c3c2b7", band="#f0efec", unlev="#2a78d6", lev="#eb6834"),
     "dark": dict(surface="#1a1a19", ink="#ffffff", ink2="#c3c2b7", muted="#898781",
-                 grid="#2c2c2a", axis="#383835", unlev="#3987e5", lev="#d95926"),
+                 grid="#2c2c2a", axis="#383835", band="#262624", unlev="#3987e5", lev="#d95926"),
 }
+# Link-preview cards use the author's website colors around the same validated series colors.
+CARD = dict(surface="#f7f2e8", panel="#fffdf8", ink="#252422", ink2="#44413c", muted="#6d675e",
+            accent="#78283b", rule="#bd9349", grid="#e9e2d6", axis="#d8cec0",
+            unlev="#2a78d6", lev="#eb6834")
+REPO = "github.com/wang415705825/Real-Estate-Returns"
+SOURCE = f"Data: Real-Estate-Returns ({REPO}). Method: Ling and Naranjo (2015)."
+# NBER-dated U.S. recessions in the sample, from the start of the peak month to the end of
+# the trough month, on the chart's year axis (1993.0 = end of 1992Q4).
+RECESSIONS = [(2001 + 2 / 12, 2001 + 11 / 12), (2007 + 11 / 12, 2009 + 6 / 12), (2020 + 1 / 12, 2020 + 4 / 12)]
 
 
 # ----------------------------------------------------------------------------- data
@@ -239,6 +254,30 @@ def _write_normalized_zip(raw, path):
 
 
 # ----------------------------------------------------------------------------- figures
+def _use_fonts():
+    paths = sorted(glob.glob(os.path.join(FONT_DIR, "*.ttf")))
+    for p in paths:
+        font_manager.fontManager.addfont(p)
+    plt.rcParams.update({"font.family": "Inter" if paths else "DejaVu Sans",
+                         "svg.hashsalt": "rer", "path.simplify": False})
+
+
+def _figure(w, h, surface):
+    return plt.figure(figsize=(w, h), dpi=200, facecolor=surface)
+
+
+def _axes(fig, left, right, top, bottom):
+    """Axes placed by margins in inches."""
+    w, h = fig.get_size_inches()
+    return fig.add_axes([left / w, bottom / h, 1 - (left + right) / w, 1 - (top + bottom) / h])
+
+
+def _text(fig, x, y, s, **kw):
+    """Figure text placed in inches from the top-left corner."""
+    w, h = fig.get_size_inches()
+    return fig.text(x / w, 1 - y / h, s, **kw)
+
+
 def _style(ax, t, ygrid=True, xgrid=False):
     ax.set_facecolor(t["surface"])
     for side in ("top", "right", "left"):
@@ -254,51 +293,136 @@ def _style(ax, t, ygrid=True, xgrid=False):
     ax.set_axisbelow(True)
 
 
-def _titles(fig, t, title, subtitle):
-    fig.text(0.012, 0.975, title, ha="left", va="top", fontsize=13, fontweight="bold", color=t["ink"])
-    fig.text(0.012, 0.915, subtitle, ha="left", va="top", fontsize=9.5, color=t["ink2"])
+def _header(fig, t, title, subtitle, size=15):
+    _text(fig, 0.30, 0.26, title, ha="left", va="top", fontsize=size, fontweight="semibold", color=t["ink"])
+    _text(fig, 0.30, 0.66, subtitle, ha="left", va="top", fontsize=9.5, color=t["ink2"])
 
 
-def _legend(ax, t, handles, labels, loc="upper left", **kw):
-    leg = ax.legend(handles, labels, loc=loc, frameon=False, fontsize=9, handlelength=1.6, **kw)
-    for txt in leg.get_texts():
-        txt.set_color(t["ink2"])
-    return leg
+def _source(fig, t, note=SOURCE):
+    w, h = fig.get_size_inches()
+    fig.text(0.30 / w, 0.16 / h, note, ha="left", va="bottom", fontsize=7.5, color=t["muted"])
 
 
-def _save(fig, name, mode):
-    suffix = "" if mode == "light" else "-dark"
+def _key(fig, t, items, x, y):
+    """One-row legend. items: (kind, color, label) with kind line, dot or patch; x, y in inches."""
+    w, h = fig.get_size_inches()
+    renderer = fig.canvas.get_renderer()
+    yy = 1 - y / h
+    for kind, color, label in items:
+        if kind == "line":
+            fig.add_artist(plt.Line2D([x / w, (x + 0.26) / w], [yy, yy], color=color, lw=1.8,
+                                      solid_capstyle="round"))
+            x += 0.36
+        elif kind == "dot":
+            fig.add_artist(plt.Line2D([(x + 0.06) / w], [yy], marker="o", ms=7, color=color, lw=0,
+                                      mec=t["surface"], mew=1.2))
+            x += 0.20
+        else:
+            fig.add_artist(Rectangle((x / w, yy - 0.06 / h), 0.26 / w, 0.12 / h, color=color, lw=0))
+            x += 0.36
+        txt = fig.text(x / w, yy, label, ha="left", va="center", fontsize=9, color=t["ink2"])
+        x += txt.get_window_extent(renderer).width / fig.dpi + 0.30
+
+
+def _save(fig, name, mode="light"):
+    suffix = "-dark" if mode == "dark" else ""
     fig.savefig(os.path.join(FIGS, f"{name}{suffix}.png"), dpi=200, facecolor=fig.get_facecolor(),
                 metadata={"Software": None})
     plt.close(fig)
 
 
+def _growth(idx, col):
+    """Growth of $1 from the end of 1992Q4, on a quarter-end year axis."""
+    x = np.r_[1993.0, (idx.year + idx.quarter / 4.0).values]
+    return x, np.r_[1.0, (1 + idx[col] / 100).cumprod().values]
+
+
+def _pp(v):
+    return f"{'+' if v >= 0 else '−'}{abs(v):.2f} pp"
+
+
 def fig_cumulative(idx, mode):
     t = THEMES[mode]
-    x = idx.year + idx.quarter / 4.0                      # quarter-end position; 1993.0 = end of 1992Q4
-    fig, ax = plt.subplots(figsize=(8, 4.6), facecolor=t["surface"])
-    fig.subplots_adjust(left=0.08, right=0.82, top=0.83, bottom=0.10)
+    fig = _figure(8, 4.85, t["surface"])
+    ax = _axes(fig, left=0.72, right=1.25, top=1.34, bottom=0.62)
     _style(ax, t)
-    handles = []
-    for key, col, lab in [("unlev", "vw_unlev_all", "Unlevered"), ("lev", "vw_lev_all", "Levered")]:
-        level = np.r_[1.0, (1 + idx[col] / 100).cumprod().values]
-        xx = np.r_[1993.0, x.values]
-        (h,) = ax.plot(xx, level, color=t[key], linewidth=1.5, solid_joinstyle="round", solid_capstyle="round")
-        ax.plot(xx[-1], level[-1], "o", color=t[key], markersize=6, markeredgecolor=t["surface"], markeredgewidth=1.5)
-        ax.annotate(f"{lab}  ${level[-1]:.2f}", (xx[-1], level[-1]), xytext=(8, 0), textcoords="offset points",
-                    va="center", fontsize=9, color=t["ink2"])
-        handles.append((h, lab))
+    for a, b in RECESSIONS:
+        ax.axvspan(a, b, color=t["band"], lw=0, zorder=0)
+    x, unlev = _growth(idx, "vw_unlev_all")
+    _, lev = _growth(idx, "vw_lev_all")
+    wash = to_rgba(t["lev"], 0.13)
+    ax.fill_between(x, unlev, lev, color=wash, lw=0, zorder=1)
+    for key, level, name, side in [("lev", lev, "Levered", 1), ("unlev", unlev, "Unlevered", -1)]:
+        ax.plot(x, level, color=t[key], lw=1.6, solid_joinstyle="round", solid_capstyle="round", zorder=3)
+        ax.plot(x[-1], level[-1], "o", color=t[key], ms=6.5, mec=t["surface"], mew=1.5, zorder=4)
+        ax.annotate(f"${level[-1]:.2f}", (x[-1], level[-1]), xytext=(9, 0), textcoords="offset points",
+                    ha="left", va="center", fontsize=11, fontweight="semibold", color=t["ink"])
+        ax.annotate(name, (x[-1], level[-1]), xytext=(9, 8 * side), textcoords="offset points",
+                    ha="left", va="bottom" if side > 0 else "top", fontsize=8.5, color=t["ink2"])
     ax.set_yscale("log")
     ax.yaxis.set_major_locator(FixedLocator([1, 2, 5, 10, 20]))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"${v:g}"))
     ax.yaxis.set_minor_locator(FixedLocator([]))
-    ax.set_ylim(0.85, 27)
-    ax.set_xlim(1992.5, 2026.3)
+    ax.set_ylim(0.85, 28)
+    ax.set_xlim(1992.6, 2026.2)
     ax.xaxis.set_major_locator(FixedLocator(list(range(1995, 2026, 5))))
-    _legend(ax, t, [h for h, _ in handles], [lab for _, lab in handles])
-    _titles(fig, t, "Growth of $1 in U.S. equity REITs, 1993–2025",
-            "Value-weighted, all equity REITs; quarterly total returns compounded; log scale")
+    _header(fig, t, "REIT stocks vs. the assets behind them",
+            "Growth of $1 invested at the start of 1993 in U.S. equity REITs, value-weighted; "
+            "quarterly total returns, log scale")
+    _key(fig, t, [("line", t["lev"], "Levered: REIT stock"), ("line", t["unlev"], "Unlevered: REIT assets"),
+                  ("patch", wash, "Gap from leverage"), ("patch", t["band"], "U.S. recession (NBER)")],
+         x=0.30, y=1.06)
+    _source(fig, t)
     _save(fig, "cumulative_returns", mode)
+
+
+def fig_property_types(sm, mode):
+    t = THEMES[mode]
+    full = sm[(sm.period_start == "1993Q1") & (sm.period_end == "2025Q4") & (sm.weighting == "VW")]
+    groups = [g for g in full.group.unique() if g not in ("Core", "Non-core")]
+    d = full[full.group.isin(groups)].pivot(index="group", columns="series", values="ann_return").round(2)
+    d["gap"] = d.levered - d.unlevered                         # from the rounded returns, so labels add up
+    types = d.drop("All").sort_values("gap")                  # bottom to top: largest gap on top
+    d = pd.concat([types, d.loc[["All"]]])
+    y = np.r_[np.arange(len(types)), len(types) + 0.35]         # All sits on top, set apart
+    fig = _figure(8, 1.40 + 0.42 * (len(d) + 0.35) + 0.66, t["surface"])
+    ax = _axes(fig, left=1.95, right=1.45, top=1.40, bottom=0.66)
+    _style(ax, t, ygrid=False, xgrid=True)
+    row = blended_transform_factory(fig.transFigure, ax.transData)
+    w = fig.get_size_inches()[0]
+    ax.add_patch(Rectangle((0.22 / w, y[-1] - 0.42), 1 - 0.44 / w, 0.84, transform=row, color=t["band"],
+                           lw=0, zorder=0, clip_on=False))
+    ax.hlines(y, d.unlevered, d.levered, color=t["muted"], lw=1.8, zorder=1)
+    ax.scatter(d.unlevered, y, s=95, color=t["unlev"], edgecolors=t["surface"], linewidths=1.5, zorder=3)
+    ax.scatter(d.levered, y, s=38, color=t["lev"], edgecolors=t["surface"], linewidths=1.5, zorder=3)
+    labels = ["All equity REITs" if g == "All" else g for g in d.index]
+    ax.set_yticks(y, labels, fontsize=9.5)
+    ax.tick_params(axis="y", colors=t["ink2"], pad=10)
+    top = ax.get_yticklabels()[-1]
+    top.set_fontweight("semibold")
+    top.set_color(t["ink"])
+    lo, hi = sorted([d.loc["All", "unlevered"], d.loc["All", "levered"]])
+    for v, off, ha in [(lo, -10, "right"), (hi, 10, "left")]:
+        ax.annotate(f"{v:.2f}%", (v, y[-1]), xytext=(off, 0), textcoords="offset points",
+                    ha=ha, va="center", fontsize=8.5, color=t["ink2"])
+    xcol = 1 - 0.40 / w
+    for yy, g, gap in zip(y, d.index, d.gap):
+        ax.text(xcol, yy, _pp(gap), transform=row, ha="right", va="center", fontsize=9.5,
+                fontweight="semibold" if g == "All" else "normal", color=t["ink"] if g == "All" else t["ink2"])
+    ax.text(xcol, y[-1] + 0.95, "Levered − unlevered", transform=row, ha="right", va="center",
+            fontsize=8.5, color=t["muted"])
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}%"))
+    ax.xaxis.set_major_locator(MultipleLocator(2))
+    ax.set_xlim(np.floor(d[["unlevered", "levered"]].min().min() - 0.6),
+                np.ceil(d[["unlevered", "levered"]].max().max() + 0.6))
+    ax.set_ylim(-0.6, y[-1] + 0.55)
+    _header(fig, t, "What leverage added, by property type",
+            "Annualized total return 1993–2025, value-weighted; property types with at least 3 REITs "
+            "in every quarter")
+    _key(fig, t, [("dot", t["unlev"], "Unlevered: REIT assets"), ("dot", t["lev"], "Levered: REIT stock")],
+         x=0.30, y=1.06)
+    _source(fig, t)
+    _save(fig, "property_type_returns", mode)
 
 
 def fig_ln2015(idx, mode):
@@ -308,53 +432,83 @@ def fig_ln2015(idx, mode):
           if r[0] is not None and r[2] is not None}
     ours = idx.set_index(["year", "quarter"]).vw_unlev_core
     m = pd.DataFrame({"ln": pd.Series(ln), "ours": ours}).dropna()
-    fig, ax = plt.subplots(figsize=(6.2, 6.0), facecolor=t["surface"])
-    fig.subplots_adjust(left=0.13, right=0.96, top=0.84, bottom=0.11)
+    fig = _figure(5.9, 6.6, t["surface"])
+    ax = _axes(fig, left=0.95, right=0.35, top=1.05, bottom=0.95)
     _style(ax, t, ygrid=True, xgrid=True)
     lim = (-24, 18)
     ax.plot(lim, lim, color=t["muted"], linewidth=1.0, zorder=1)
     ax.scatter(m.ln, m.ours, s=36, color=t["unlev"], edgecolors=t["surface"], linewidths=1.2, zorder=3)
-    ax.set_xlim(lim); ax.set_ylim(lim); ax.set_aspect("equal")
-    ax.xaxis.set_major_locator(MultipleLocator(10)); ax.yaxis.set_major_locator(MultipleLocator(10))
-    ax.set_xlabel("Ling & Naranjo (2015), % per quarter", fontsize=9.5, color=t["ink2"], labelpad=8)
+    ax.set_xlim(lim)
+    ax.set_ylim(lim)
+    ax.xaxis.set_major_locator(MultipleLocator(10))
+    ax.yaxis.set_major_locator(MultipleLocator(10))
+    ax.set_xlabel("Ling and Naranjo (2015), % per quarter", fontsize=9.5, color=t["ink2"], labelpad=8)
     ax.set_ylabel("This dataset, % per quarter", fontsize=9.5, color=t["ink2"], labelpad=6)
-    ax.text(0.04, 0.95, f"Correlation {m.ours.corr(m.ln):.3f}\n{len(m)} quarters, 1993Q1–2012Q4",
-            transform=ax.transAxes, va="top", fontsize=9, color=t["ink2"])
-    _titles(fig, t, "Validation against Ling & Naranjo (2015)",
-            "Value-weighted unlevered core REIT return; one dot per quarter, gray line = equality")
+    first, last = m.index[0], m.index[-1]
+    ax.text(0.04, 0.96, f"Correlation {m.ours.corr(m.ln):.3f}", transform=ax.transAxes, va="top",
+            fontsize=11, fontweight="semibold", color=t["ink"])
+    ax.text(0.04, 0.905, f"{len(m)} quarters, {first[0]}Q{first[1]}–{last[0]}Q{last[1]}\nGray line: equal returns",
+            transform=ax.transAxes, va="top", fontsize=9, color=t["ink2"], linespacing=1.5)
+    _header(fig, t, "Tracks Ling and Naranjo (2015) closely",
+            "Value-weighted unlevered core REIT return, one dot per quarter")
+    _source(fig, t, f"Data: Real-Estate-Returns ({REPO}).")
     _save(fig, "validation_ln2015", mode)
 
 
-def fig_property_types(sm, mode):
-    t = THEMES[mode]
-    full = sm[(sm.period_start == "1993Q1") & (sm.period_end == "2025Q4") & (sm.weighting == "VW")]
-    groups = [g for g in full.group.unique() if g not in ("Core", "Non-core")]
-    d = (full[full.group.isin(groups)].pivot(index="group", columns="series", values="ann_return")
-         .sort_values("unlevered"))
-    labels = ["All equity REITs" if g == "All" else g for g in d.index]
-    fig, ax = plt.subplots(figsize=(8, 0.46 * len(d) + 1.9), facecolor=t["surface"])
-    fig.subplots_adjust(left=0.22, right=0.97, top=1 - 0.95 / (0.46 * len(d) + 1.9), bottom=0.12)
-    _style(ax, t, ygrid=False, xgrid=True)
-    y = np.arange(len(d))
-    ax.hlines(y, d.unlevered, d.levered, color=t["muted"], linewidth=1.5, zorder=1)
-    hu = ax.scatter(d.unlevered, y, s=90, color=t["unlev"], edgecolors=t["surface"], linewidths=1.5, zorder=3)
-    hl = ax.scatter(d.levered, y, s=34, color=t["lev"], edgecolors=t["surface"], linewidths=1.5, zorder=3)
-    ax.set_yticks(y, labels, fontsize=9, color=t["ink2"])
-    ax.tick_params(axis="y", colors=t["ink2"])
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}%"))
-    ax.xaxis.set_major_locator(MultipleLocator(2))
-    lo, hi = np.floor(d.min().min() - 1), np.ceil(d.max().max() + 1)
-    ax.set_xlim(lo, hi)
-    ax.set_ylim(-0.6, len(d) - 0.4)
-    if "All" in d.index:
-        i = list(d.index).index("All")
-        for col, off, ha in [("unlevered", -9, "right"), ("levered", 9, "left")]:
-            ax.annotate(f"{d.loc['All', col]:.2f}%", (d.loc["All", col], i), xytext=(off, 0),
-                        textcoords="offset points", ha=ha, va="center", fontsize=8.5, color=t["ink2"])
-    _legend(ax, t, [hu, hl], ["Unlevered", "Levered"], loc="lower right")
-    _titles(fig, t, "Annualized returns by property type, 1993–2025",
-            "Value-weighted; property types with at least 3 REITs in every quarter")
-    _save(fig, "property_type_returns", mode)
+def fig_card(idx, sm, name, w, h):
+    """Link-preview card (GitHub social preview, website and social posts); light only."""
+    c = CARD
+    full = sm[(sm.period_start == "1993Q1") & (sm.period_end == "2025Q4") & (sm.group == "All")
+              & (sm.weighting == "VW")].set_index("series").ann_return
+    fig = _figure(w, h, c["surface"])
+    fig.add_artist(Rectangle((0, 1 - 0.07 / h), 1, 0.07 / h, color=c["accent"], lw=0))
+    x0 = 0.42
+    px, pw = 0.555 * w, 0.42 * w                                  # chart panel, inches
+    py, ph = 0.40, h - 0.80
+    _text(fig, x0, 0.38, "Open data  ·  1993–2025", ha="left", va="top", fontsize=8.5, fontweight="semibold",
+          color=c["accent"])
+    _text(fig, x0, 0.60, "U.S. REIT\nReturn Indices", ha="left", va="top", fontsize=23, fontweight="bold",
+          color=c["ink"], linespacing=1.02)
+    _text(fig, x0, 1.44, "Quarterly unlevered and levered total\nreturns for U.S. equity REITs",
+          ha="left", va="top", fontsize=9.5, color=c["ink2"], linespacing=1.4)
+    fig.add_artist(plt.Line2D([x0 / w, (x0 + 0.5) / w], [1 - 1.90 / h] * 2, color=c["rule"], lw=2))
+    tiles = [(f"{full['levered']:.2f}%", "per year,\nREIT stock"),
+             (f"{full['unlevered']:.2f}%", "per year,\nREIT assets"),
+             (f"{idx.n_all.min()}–{idx.n_all.max()}", "REITs per\nquarter")]
+    renderer = fig.canvas.get_renderer()
+    xx = x0
+    for value, label in tiles:
+        a = _text(fig, xx, 2.02, value, ha="left", va="top", fontsize=15, fontweight="semibold", color=c["ink"])
+        b = _text(fig, xx, 2.30, label, ha="left", va="top", fontsize=7, color=c["muted"], linespacing=1.3)
+        xx += max(a.get_window_extent(renderer).width, b.get_window_extent(renderer).width) / fig.dpi + 0.30
+    _text(fig, x0, h - 0.26, f"Chongyu Wang  ·  Florida State University  ·  {REPO}", ha="left",
+          va="bottom", fontsize=7, color=c["ink2"])
+    fig.add_artist(FancyBboxPatch((px / w, py / h), pw / w, ph / h, boxstyle="round,pad=0,rounding_size=0.012",
+                                  transform=fig.transFigure, facecolor=c["panel"], edgecolor=c["axis"], lw=0.8,
+                                  zorder=0))
+    _text(fig, px + 0.18, h - py - ph + 0.18, "Growth of $1 since 1993", ha="left", va="top", fontsize=8.5,
+          fontweight="semibold", color=c["ink2"])
+    ax = fig.add_axes([(px + 0.42) / w, (py + 0.32) / h, (pw - 1.02) / w, (ph - 0.80) / h], zorder=1)
+    t = dict(surface=c["panel"], axis=c["axis"], muted=c["muted"], grid=c["grid"])
+    _style(ax, t)
+    ax.tick_params(labelsize=7, pad=4)
+    for key, col, label in [("lev", "vw_lev_all", "Levered"), ("unlev", "vw_unlev_all", "Unlevered")]:
+        x, level = _growth(idx, col)
+        ax.plot(x, level, color=c[key], lw=1.4, solid_joinstyle="round", solid_capstyle="round", zorder=3)
+        ax.plot(x[-1], level[-1], "o", color=c[key], ms=5, mec=c["panel"], mew=1.2, zorder=4)
+        ax.annotate(f"${level[-1]:.2f}", (x[-1], level[-1]), xytext=(6, 0), textcoords="offset points",
+                    ha="left", va="center", fontsize=8.5, fontweight="semibold", color=c["ink"])
+        ax.annotate(label, (x[-1], level[-1]), xytext=(6, 6 if key == "lev" else -6), textcoords="offset points",
+                    ha="left", va="bottom" if key == "lev" else "top", fontsize=6.5, color=c["ink2"])
+    ax.set_yscale("log")
+    ax.yaxis.set_major_locator(FixedLocator([1, 5, 20]))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"${v:g}"))
+    ax.yaxis.set_minor_locator(FixedLocator([]))
+    ax.set_ylim(0.85, 28)
+    ax.set_xlim(1992.6, 2026.2)
+    ax.xaxis.set_major_locator(FixedLocator([1995, 2005, 2015, 2025]))
+    fig.savefig(os.path.join(FIGS, f"{name}.png"), dpi=200, facecolor=c["surface"], metadata={"Software": None})
+    plt.close(fig)
 
 
 def main():
@@ -363,11 +517,13 @@ def main():
     update_readme(readme_table(sm, idx))
     workbook()
     os.makedirs(FIGS, exist_ok=True)
-    plt.rcParams.update({"font.family": "DejaVu Sans", "svg.hashsalt": "rer", "path.simplify": False})
+    _use_fonts()
     for mode in THEMES:
         fig_cumulative(idx, mode)
         fig_ln2015(idx, mode)
         fig_property_types(sm, mode)
+    fig_card(idx, sm, "social_preview", 6.4, 3.2)              # 1280 x 640, GitHub social preview
+    fig_card(idx, sm, "social_card_1200x630", 6.0, 3.15)       # 1200 x 630, website and social posts
     print("wrote data/summary_statistics.csv, data/REIT_Return_Indices.xlsx, figures/*.png")
 
 

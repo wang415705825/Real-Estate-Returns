@@ -1,8 +1,9 @@
 The data and documentation in this repository - the files in data/, docs/ and figures/,
 and the README and other text files - are licensed under the Creative Commons
 Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0), reproduced below.
-The code in pipeline/ and scripts/ is licensed separately under the MIT License (LICENSE).
-The files in legacy/ are the 2021-04 release as originally published; the Ling and
+The code in pipeline/ and scripts/ is licensed separately under the MIT License (LICENSE),
+except the Inter font files in scripts/fonts/, which are under the SIL Open Font License 1.1
+(scripts/fonts/OFL.txt). The files in legacy/ are the 2021-04 release as originally published; the Ling and
 Naranjo (2015) series in that workbook is their work.
 
 Licensor: Chongyu Wang. Please attribute by citing the works listed in README.md and
