@@ -10,6 +10,9 @@
   14 S&P Global property types; REIT counts for every cell.
 - **New files:** CSV data, an Excel workbook, summary statistics, figures, validation
   scripts, integrity checks and the construction code.
+- **Figures and citation metadata:** figures in the Inter typeface with takeaway titles, a
+  source line and NBER recession shading; link-preview cards for GitHub and social media;
+  Zenodo metadata (`.zenodo.json`) and the author's ORCID in `CITATION.cff`.
 - **Not carried forward:** the Ling and Naranjo (2015) comparison column; it remains in the
   legacy workbook.
 - **Pending:** the 1993Q1 values of `vw_lev_core`, `vw_unlev_noncore` and `vw_lev_noncore`.

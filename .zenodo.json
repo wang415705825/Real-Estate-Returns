@@ -1,0 +1,36 @@
+{
+  "upload_type": "dataset",
+  "title": "Unlevered and levered U.S. equity REIT return indices",
+  "creators": [
+    {
+      "name": "Wang, Chongyu",
+      "affiliation": "Florida State University",
+      "orcid": "0000-0003-3754-2383"
+    }
+  ],
+  "description": "<p>Quarterly unlevered (asset-level) and levered (equity) total-return indices for U.S. equity REITs, 1993Q1–2025Q4: all equity REITs, core and non-core property types, and 14 property types, value- and equal-weighted, with REIT counts. Unlevered returns follow the de-levering method of Ling and Naranjo (2015). The series are aggregates compiled from CRSP and Compustat (via WRDS) and S&P Global Market Intelligence; no vendor data are included. The repository also contains the construction code, documentation and validation against Ling and Naranjo (2015) and the FTSE Nareit All Equity REITs index.</p><p>If you use these data, please cite Ling, D. C., Wang, C., and Zhou, T. (2022), Asset productivity, local information diffusion, and commercial real estate returns, Real Estate Economics 50(1), 89–121, and Ling, D. C., and Naranjo, A. (2015), Returns and information transmission dynamics in public and private real estate markets, Real Estate Economics 43(1), 163–208.</p>",
+  "access_right": "open",
+  "license": "cc-by-nc-4.0",
+  "keywords": [
+    "REIT",
+    "real estate",
+    "unlevered returns",
+    "commercial real estate",
+    "return indices",
+    "asset pricing"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.1111/1540-6229.12354",
+      "relation": "isSupplementTo",
+      "scheme": "doi",
+      "resource_type": "publication-article"
+    },
+    {
+      "identifier": "10.1111/1540-6229.12069",
+      "relation": "references",
+      "scheme": "doi",
+      "resource_type": "publication-article"
+    }
+  ]
+}

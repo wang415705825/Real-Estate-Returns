@@ -67,7 +67,8 @@ To add quarters for a new vintage:
 
    | File | What to change |
    |---|---|
-   | `scripts/build_outputs.py` | `VINTAGE` and `STAMP`, and the zip `date_time` in `_write_normalized_zip` (keep it equal to `STAMP`); the end quarter in `PERIODS`; the `"2025Q4"` filters and the table label in `readme_table` and `fig_property_types`; the years in the two figure titles; the coverage line in `NOTES` |
+   | `scripts/build_outputs.py` | `VINTAGE` and `STAMP`, and the zip `date_time` in `_write_normalized_zip` (keep it equal to `STAMP`); the end quarter in `PERIODS`; the `"2025Q4"` filters in `readme_table`, `fig_property_types` and `fig_card`, and the table label in `readme_table`; the end year in the property-type subtitle and in the cards' "Open data · 1993–2025" line; `RECESSIONS` if the NBER has dated a new recession; the coverage line in `NOTES` |
+   | `.zenodo.json` | the coverage in `description` |
    | `scripts/check_data.py` | `LAST`; `ALLOWED_BLANK` (empty it once no cells are pending) |
    | `CITATION.cff` | `version`, `date-released`, and the coverage in `abstract` |
    | `README.md`, `data/README.md`, `docs/methodology.md` | coverage strings, sample counts (REITs, REIT-quarters, REITs per quarter, rows, blanked cells), validation numbers and the figure alt texts |
