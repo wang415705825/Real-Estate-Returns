@@ -1,0 +1,18 @@
+# Licensed inputs and intermediate files never belong in this repository
+*.dta
+*.parquet
+*.feather
+*.pkl
+*.sas7bdat
+*.xls
+*.smcl
+*.log
+*.gph
+.env
+
+# Python and OS clutter
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
